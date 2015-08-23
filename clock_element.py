@@ -59,7 +59,7 @@ class STMClockConnection:
 		return self.__str__()
 
 	def __str__(self):
-		s = "Connection( {} ---{}--> {}".format(self.begin, self.id, self.end)
+		s = "Connection( {} ---{}--> {}".format(self.begin.id, self.id, self.end.id)
 		if len(self.parameters) > 0:
 			s += ',\n\t' + ',\n\t'.join(map(str, self.parameters))
 		return s + ' )'
@@ -67,13 +67,10 @@ class STMClockConnection:
 	def __eq__(self, other):
 		if not isinstance(other, STMClockConnection):
 			return False
-
-		return (self.begin == other.begin and
-				self.id == other.id and
-				self.end == other.end)
+		return (self.id == other.id)
 
 	def __hash__(self):
-		return hash(self.begin, self.id, self.end)
+		return hash(self.id)
 
 
 class STMClockElement:
@@ -119,4 +116,26 @@ class STMClockElement:
 		if len([a for a in self.attributes.keys() if a != 'refParameter']) > 0:
 			s += ',\n\t' + ',\n\t'.join(["{}='{}'".format(key, value) for (key, value) in self.attributes.items() if key != 'refParameter'])
 		return s + ' )'
+
+	def getParents(self):
+		parents = list(self.inputs)
+		for parent in parents:
+			parents.extend(parent.getParents())
+		parents = list(set(parents))
+		return parents
+
+	def getChildren(self):
+		children = list(self.outputs)
+		for child in children:
+			children.extend(child.getChildren())
+		children = list(set(children))
+		return children
+
+	def __eq__(self, other):
+		if not isinstance(other, STMClockElement):
+			return False
+		return (self.id == other.id)
+
+	def __hash__(self):
+		return hash(self.id)
 

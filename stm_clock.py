@@ -70,6 +70,12 @@ class STMClockReader(XMLDeviceReader):
 
 			self.elements.append(e)
 
+		for signal in self.query("//Signals/Signal"):
+			param = signal.get('refParameter')
+			if param is not None and param != "":
+				conn = [c for c in self.connections if c.id == signal.get('id')][0]
+				conn.attributes['refParameter'] = param
+
 		# connect the element input and outputs with the actual object, not just the id string
 		for element in self.elements:
 			inputs = []
@@ -80,35 +86,39 @@ class STMClockReader(XMLDeviceReader):
 				outputs.extend([e for e in self.elements if e.id == o])
 			element.inputs = inputs
 			element.outputs = outputs
-
-		for signal in self.query("//Signals/Signal"):
-			param = signal.get('refParameter')
-			if param is not None and param != "":
-				conn = [c for c in self.connections if c.id == signal.get('id')][0]
-				conn.attributes['refParameter'] = param
-
-		for element in self.elements:
 			self.log.debug("STMClockReader: {}".format(element))
 
 		for conn in self.connections:
 			if 'refParameter' in conn.attributes:
 				conn.parameters = [p for p in self.parameters if p.name == conn.attributes['refParameter']]
+
+			conn.begin = filter(lambda e: e.id == conn.begin, self.elements)[0]
+			conn.end = filter(lambda e: e.id == conn.end, self.elements)[0]
 			self.log.debug("STMClockReader: {}".format(conn))
 
+		# find the SYSCLK connection
+		sysClk = filter(lambda c: c.id == 'SYSCLK', self.connections)[0]
 
-		# simple filtering now possible
-		self.sources = [e for e in self.elements if len(e.inputs) == 0]
-		self.sinks = [e for e in self.elements if len(e.outputs) == 0]
-		self.divisors = [e for e in self.elements if e.type == 'devisor'] # yes, ST misspelled divisor
-		self.multiplexors = [e for e in self.elements if e.type == 'multiplexor']
-		self.multiplicator = [e for e in self.elements if e.type == 'multiplicator']
+		# find the clock tree elements
+		clockTree = sysClk.begin.getChildren()
+		# and the system clock elements
+		systemClock = sysClk.end.getParents()
+
+		print '### ClockTree ###'
+		for e in clockTree:
+			print e
+
+		print '\n### SytemClock ###'
+		for e in systemClock:
+			print e
 
 		"""
-		for s in self.sources:
-			print s
-
-		for s in self.sinks:
-			print s
+		# simple filtering now possible
+		self.sources = filter(lambda e: len(e.inputs) == 0, self.elements)
+		self.sinks = filter(lambda e: len(e.outputs) == 0, self.elements)
+		self.divisors = filter(lambda e: e.type == 'devisor', self.elements) # yes, ST misspelled divisor
+		self.multiplexors = filter(lambda e: e.type == 'multiplexor', self.elements)
+		self.multiplicator = filter(lambda e: e.type == 'multiplicator', self.elements)
 		"""
 
 		""" # don't read the stuff manually
@@ -160,6 +170,6 @@ class STMClockReader(XMLDeviceReader):
 
 
 if __name__ == "__main__":
-	level = 'debug'
+	level = 'info'
 	logger = Logger(level)
 	device = STMClockReader('STM32F100', logger)
