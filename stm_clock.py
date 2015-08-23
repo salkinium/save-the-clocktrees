@@ -19,6 +19,7 @@ from stm import stm32_memory
 
 from clock_element import STMClockElement
 from clock_element import STMClockConnection
+from clock_element import STMXMLParameter
 
 
 class STMClockReader(XMLDeviceReader):
@@ -38,6 +39,16 @@ class STMClockReader(XMLDeviceReader):
 		rccName = "RCC-STM32F100_rcc_v1_0_Modes"
 		self.rcc = XMLDeviceReader(os.path.join(os.path.dirname(__file__), 'data', rccName + '.xml'), logger)
 
+		self.parameters = []
+		for parameter in self.rcc.query("//RefParameter"):
+			p = STMXMLParameter(parameter.attrib)
+
+			p.values = [c.attrib for c in parameter.getchildren() if c.tag == 'PossibleValue']
+			p.conditions = [c.attrib for c in parameter.getchildren() if c.tag == 'Condition']
+
+			self.parameters.append(p)
+			# self.log.debug("STMClockReader: {}".format(p))
+
 		self.elements = []
 		self.connections = []
 
@@ -47,6 +58,9 @@ class STMClockReader(XMLDeviceReader):
 			# only store the ids of the in and outputs for now
 			e.outputs = [c.get('to') for c in element.getchildren() if c.tag == 'Output']
 			e.inputs = [c.get('from') for c in element.getchildren() if c.tag == 'Input']
+			e.conditions = [c.attrib for c in element.getchildren() if c.tag == 'Condition']
+			if 'refParameter' in e.attributes:
+				e.parameters = [p for p in self.parameters if p.name == e.attributes['refParameter']]
 
 			# create the connections
 			for c in [c.attrib for c in element.getchildren() if c.tag in ['Input', 'Output']]:
@@ -77,6 +91,8 @@ class STMClockReader(XMLDeviceReader):
 			self.log.debug("STMClockReader: {}".format(element))
 
 		for conn in self.connections:
+			if 'refParameter' in conn.attributes:
+				conn.parameters = [p for p in self.parameters if p.name == conn.attributes['refParameter']]
 			self.log.debug("STMClockReader: {}".format(conn))
 
 
