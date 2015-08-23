@@ -17,6 +17,9 @@ from stm import stm32_defines
 from stm import stm32f1_remaps
 from stm import stm32_memory
 
+from clock_element import STMClockElement
+from clock_element import STMClockConnection
+
 
 class STMClockReader(XMLDeviceReader):
 	""" STMClockReader
@@ -30,18 +33,72 @@ class STMClockReader(XMLDeviceReader):
 		self.name = deviceName
 		self.id = DeviceIdentifier(self.name.lower())
 
-		if logger:
-			logger.info("STMClockReader: Parsing '{}'".format(self.id.string))
+		self.log.info("STMClockReader: Parsing '{}'".format(self.id.string))
 
 		rccName = "RCC-STM32F100_rcc_v1_0_Modes"
 		self.rcc = XMLDeviceReader(os.path.join(os.path.dirname(__file__), 'data', rccName + '.xml'), logger)
 
+		self.elements = []
+		self.connections = []
+
+		# read all elements and connections
+		for element in self.query("//Element"):
+			e = STMClockElement(element.attrib)
+			# only store the ids of the in and outputs for now
+			e.outputs = [c.get('to') for c in element.getchildren() if c.tag == 'Output']
+			e.inputs = [c.get('from') for c in element.getchildren() if c.tag == 'Input']
+
+			# create the connections
+			for c in [c.attrib for c in element.getchildren() if c.tag in ['Input', 'Output']]:
+				conn = STMClockConnection(e, c)
+				if conn not in self.connections:
+					self.connections.append(conn)
+
+			self.elements.append(e)
+
+		# connect the element input and outputs with the actual object, not just the id string
+		for element in self.elements:
+			inputs = []
+			outputs = []
+			for i in element.inputs:
+				inputs.extend([e for e in self.elements if e.id == i])
+			for o in element.outputs:
+				outputs.extend([e for e in self.elements if e.id == o])
+			element.inputs = inputs
+			element.outputs = outputs
+
+		for signal in self.query("//Signals/Signal"):
+			param = signal.get('refParameter')
+			if param is not None and param != "":
+				conn = [c for c in self.connections if c.id == signal.get('id')][0]
+				conn.attributes['refParameter'] = param
+
+		for element in self.elements:
+			self.log.debug("STMClockReader: {}".format(element))
+
+		for conn in self.connections:
+			self.log.debug("STMClockReader: {}".format(conn))
+
+
+		# simple filtering now possible
+		self.sources = [e for e in self.elements if len(e.inputs) == 0]
+		self.sinks = [e for e in self.elements if len(e.outputs) == 0]
+		self.divisors = [e for e in self.elements if e.type == 'devisor'] # yes, ST misspelled divisor
+		self.multiplexors = [e for e in self.elements if e.type == 'multiplexor']
+		self.multiplicator = [e for e in self.elements if e.type == 'multiplicator']
+
+		"""
+		for s in self.sources:
+			print s
+
+		for s in self.sinks:
+			print s
+		"""
+
+		""" # don't read the stuff manually
 		# clock sources
 		self.sources = []
-
-		sources = self.query("//Clock/Tree/Element[contains(@type,'Source')]")
-
-		for source in sources:
+		for source in self.query("//Clock/Tree/Element[contains(@type,'Source')]"):
 			clks = []
 			for p in self._getParameter(source.get('refParameter')):
 				c = {'speed': 'high' if 'HS' in p.get('Name') else 'low',
@@ -71,6 +128,8 @@ class STMClockReader(XMLDeviceReader):
 
 		for s in self.sources:
 			print s
+		"""
+
 
 
 
@@ -85,6 +144,6 @@ class STMClockReader(XMLDeviceReader):
 
 
 if __name__ == "__main__":
-	level = 'info'
+	level = 'debug'
 	logger = Logger(level)
 	device = STMClockReader('STM32F100', logger)
