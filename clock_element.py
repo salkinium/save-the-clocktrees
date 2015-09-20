@@ -131,6 +131,40 @@ class STMClockElement:
 		children = list(set(children))
 		return children
 
+	def getParentPaths(self):
+		paths = self._getParentPaths()
+
+		flatPaths = []
+		self._flattenList(flatPaths, paths)
+
+		return flatPaths
+
+	def _flattenList(self, output, input):
+		for i in input:
+			if isinstance(i[0], STMClockElement):
+				output.append(i)
+			else:
+				self._flattenList(output, i)
+
+
+	def _getParentPaths(self, input = []):
+		paths = []
+		for i in self.inputs:
+			p = list(input)
+			p.append(i)
+			p = i._getParentPaths(p)
+			paths.append(p)
+
+		if paths == []:
+			return input
+
+		if len(paths) == 1:
+			return paths[0]
+
+		return paths
+
+
+
 	def __eq__(self, other):
 		if not isinstance(other, STMClockElement):
 			return False
