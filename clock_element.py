@@ -27,7 +27,7 @@ class STMXMLParameter:
 	def __str__(self):
 		s = "XmlParameter( {}{}{}".format(self.name,
 			'' if len(self.values) == 0 else ':{}'.format(len(self.values)),
-			'' if len(self.conditions) == 0 else '?{}'.format(len(self.conditions)))
+			'' if len(self.conditions) == 0 else '?{}({})'.format(len(self.conditions), ",".join([c['Expression'] for c in self.conditions])))
 		if len(self.attributes) > 0:
 			s += ', ' + ', '.join(["{}='{}'".format(key, value) for (key, value) in self.attributes.items()])
 		return s + ' )'
