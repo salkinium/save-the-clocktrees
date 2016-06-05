@@ -20,6 +20,11 @@ from stm import stm32_memory
 from clock_element import STMClockElement
 from clock_element import STMClockConnection
 from clock_element import STMXMLParameter
+from clock_element import STMXMLValue
+from clock_element import STMXMLCondition
+
+import networkx as nx
+# import matplotlib.pyplot as plt
 
 
 class STMClockReader(XMLDeviceReader):
@@ -33,6 +38,7 @@ class STMClockReader(XMLDeviceReader):
 		XMLDeviceReader.__init__(self, os.path.join(os.path.dirname(__file__), 'data', deviceName + '.xml'), logger)
 		self.name = deviceName
 		self.id = DeviceIdentifier(self.name.lower())
+		self.graph = nx.DiGraph()
 
 		self.log.info("STMClockReader: Parsing '{}'".format(self.id.string))
 
@@ -43,8 +49,8 @@ class STMClockReader(XMLDeviceReader):
 		for parameter in self.rcc.query("//RefParameter"):
 			p = STMXMLParameter(parameter.attrib)
 
-			p.values = [c.attrib for c in parameter.getchildren() if c.tag == 'PossibleValue']
-			p.conditions = [c.attrib for c in parameter.getchildren() if c.tag == 'Condition']
+			p.values = [STMXMLValue(c.attrib) for c in parameter.getchildren() if c.tag == 'PossibleValue']
+			p.conditions = [STMXMLCondition(c.attrib) for c in parameter.getchildren() if c.tag == 'Condition']
 
 			self.parameters.append(p)
 			# self.log.debug("STMClockReader: {}".format(p))
@@ -88,6 +94,25 @@ class STMClockReader(XMLDeviceReader):
 			element.outputs = outputs
 			self.log.debug("STMClockReader: {}".format(element))
 
+
+
+			for p in element.parameters:
+				# self.graph.add_edge(element, p)
+				# for v in p.values:
+				# 	self.graph.add_edge(p, v)
+				# for c in p.conditions:
+				# 	self.graph.add_edge(p, c)
+
+				if 'IP' in p.attributes:
+					for ip in p.attributes['IP'].split(','):
+						e = STMClockElement({'id': ip, 'type': "ip"})
+						# self.graph.add_edge(e, element)
+
+			for i in element.inputs:
+				self.graph.add_edge(i, element)
+			for o in element.outputs:
+				self.graph.add_edge(element, o)
+
 		for conn in self.connections:
 			if 'refParameter' in conn.attributes:
 				conn.parameters = [p for p in self.parameters if p.name == conn.attributes['refParameter']]
@@ -96,7 +121,7 @@ class STMClockReader(XMLDeviceReader):
 			conn.end = filter(lambda e: e.id == conn.end, self.elements)[0]
 			self.log.debug("STMClockReader: {}".format(conn))
 
-
+		"""
 		# find the SYSCLK connection
 		sysClk = filter(lambda c: c.id == 'SYSCLK', self.connections)[0]
 
@@ -105,7 +130,6 @@ class STMClockReader(XMLDeviceReader):
 		# and the system clock elements
 		systemClockSource = sysClk.end.getParents()
 
-		"""
 		print '\n### SytemClock ###'
 		for e in clockTree:
 			print e
@@ -118,7 +142,6 @@ class STMClockReader(XMLDeviceReader):
 		# simple filtering now possible
 
 		self.sinks = filter(lambda e: len(e.outputs) == 0, self.elements)
-		"""
 
 		for e in self.elements:
 			print e
@@ -148,6 +171,11 @@ class STMClockReader(XMLDeviceReader):
 				input = {'name': source['name']}
 				divisor = filter(lambda c: c.type == 'devisor', path)[0]
 				print divisor.parameters
+		"""
+
+		# nx.draw_graphviz(self.graph)
+		# plt.savefig("path.png")
+		nx.write_dot(self.graph,'file.dot')
 
 
 

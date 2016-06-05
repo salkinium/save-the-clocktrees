@@ -5,6 +5,42 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'xpcc',  'tools', 'logge
 from lxml import etree
 from logger import Logger
 
+class STMXMLValue:
+	""" STMXMLValue
+	Class for describing the reference parameters IPs.
+	"""
+
+	def __init__(self, attributes):
+		self.attributes = attributes
+		self.name = attributes['Value']
+
+	def __repr__(self):
+		return self.__str__()
+
+	def __str__(self):
+		return "Value, " + ',\n'.join(["{}='{}'".format(key, value) for (key, value) in self.attributes.items()])
+
+	def __hash__(self):
+		return hash(self.name)
+
+class STMXMLCondition:
+	""" STMXMLCondition
+	Class for describing the reference parameters IPs.
+	"""
+
+	def __init__(self, attributes):
+		self.attributes = attributes
+		self.name = attributes['Expression']
+
+	def __repr__(self):
+		return self.__str__()
+
+	def __str__(self):
+		return "Condition, " + ',\n'.join(["{}='{}'".format(key, value) for (key, value) in self.attributes.items()])
+
+	def __hash__(self):
+		return hash(self.name)
+
 class STMXMLParameter:
 	""" STMXMLParameter
 	Class for describing the reference parameters IPs.
@@ -18,19 +54,33 @@ class STMXMLParameter:
 		self.conditions = []
 
 		# remove unnecessary keys from attributes
-		keys = ('Name', 'Type', 'Visible', 'Comment')
+		keys = ('Name', 'Type', 'Visible', 'Comment', 'Display', 'Unit')
 		map(self.attributes.__delitem__, filter(self.attributes.__contains__, keys))
+
+	def description(self):
+		s = "XmlParameter( {}{}{}".format(self.name,
+			'' if len(self.values) == 0 else ':{}'.format(len(self.values)),
+			'' if len(self.conditions) == 0 else '?{}({})'.format(len(self.conditions), ",".join([c.attributes['Expression'] for c in self.conditions])))
+		if len(self.attributes) > 0:
+			s += ', ' + ', '.join(["{}='{}'".format(key, value) for (key, value) in self.attributes.items()])
+		return s + ' )'
 
 	def __repr__(self):
 		return self.__str__()
 
 	def __str__(self):
-		s = "XmlParameter( {}{}{}".format(self.name,
-			'' if len(self.values) == 0 else ':{}'.format(len(self.values)),
-			'' if len(self.conditions) == 0 else '?{}({})'.format(len(self.conditions), ",".join([c['Expression'] for c in self.conditions])))
+		s = "Parameter, {}{}{}".format(
+				self.name,
+				'' if len(self.values) == 0 else ':{}'.format(len(self.values)),
+				'' if len(self.conditions) == 0 else '?{}'.format(len(self.conditions)))
 		if len(self.attributes) > 0:
-			s += ', ' + ', '.join(["{}='{}'".format(key, value) for (key, value) in self.attributes.items()])
-		return s + ' )'
+			s += ',\n' + ',\n'.join(["{}='{}'".format(key, value) for (key, value) in self.attributes.items() if key != 'IP'])
+		return s
+		# return self.description()
+
+	def __hash__(self):
+		return hash(self.description())
+
 
 class STMClockConnection:
 	""" STMClockConnection
@@ -51,18 +101,20 @@ class STMClockConnection:
 			self.begin = attributes['from']
 
 		# remove unnecessary keys from attributes
-		keys = ('signalId', 'to', 'from')
+		keys = ('signalId', 'to', 'from', 'isKey')
 		map(self.attributes.__delitem__, filter(self.attributes.__contains__, keys))
 
-
+	"""
 	def __repr__(self):
 		return self.__str__()
 
 	def __str__(self):
+
 		s = "Connection( {} ---{}--> {}".format(self.begin.id, self.id, self.end.id)
 		if len(self.parameters) > 0:
 			s += ',\n\t' + ',\n\t'.join(map(str, self.parameters))
 		return s + ' )'
+	"""
 
 	def __eq__(self, other):
 		if not isinstance(other, STMClockConnection):
@@ -89,13 +141,17 @@ class STMClockElement:
 		self.parameters = []
 
 		# remove unnecessary keys from attributes
-		keys = ('id', 'x', 'y', 'type')
+		keys = ('id', 'x', 'y', 'type', 'isKey', 'refEnable', 'orientation')
 		map(self.attributes.__delitem__, filter(self.attributes.__contains__, keys))
 
+	"""
 	def __repr__(self):
 		return self.__str__()
+	"""
 
 	def __str__(self):
+		return  "{}, {} ".format(self.type.capitalize(), self.id) + ',\n'.join(["{}='{}'".format(key, value) for (key, value) in self.attributes.items() if key not in ['refParameter']])
+		"""
 		inputs = self.inputs
 		outputs = self.outputs
 		# rather complicated, but necessary to avoid recursions!
@@ -116,6 +172,7 @@ class STMClockElement:
 		if len([a for a in self.attributes.keys() if a != 'refParameter']) > 0:
 			s += ',\n\t' + ',\n\t'.join(["{}='{}'".format(key, value) for (key, value) in self.attributes.items() if key != 'refParameter'])
 		return s + ' )'
+		"""
 
 	def getParents(self):
 		parents = list(self.inputs)
@@ -172,4 +229,3 @@ class STMClockElement:
 
 	def __hash__(self):
 		return hash(self.id)
-
